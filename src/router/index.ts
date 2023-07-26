@@ -8,6 +8,12 @@ const router = createRouter({
       name: 'home',
       component: () => import('@/views/HomeView.vue')
     },
+    {
+      path: '/repo/:id',
+      name: 'repository',
+      props: true,
+      component: () => import('@/views/RepoView.vue')
+    },
   ]
 })
 
