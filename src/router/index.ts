@@ -9,7 +9,7 @@ const router = createRouter({
       component: () => import('@/views/HomeView.vue')
     },
     {
-      path: '/repo/:id',
+      path: '/repo/:owner/:name',
       name: 'repository',
       props: true,
       component: () => import('@/views/RepoView.vue')

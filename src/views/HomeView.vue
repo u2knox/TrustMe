@@ -5,43 +5,62 @@
         class="search__input"
         type="text"
         name="search"
-        v-model="searchText"
+        v-model="githubStore.searchText"
         placeholder="Поиск"
       />
     </div>
     <div class="container">
-      <div v-if="loading" class="container__wrapper container__wrapper_loading">Загрузка</div>
-      <div v-else-if="!resultItems?.length" class="container__wrapper container__wrapper_empty">
-        <span v-if="!searchText.length">В вашем репозиторий пусто ;(</span>
+      <div v-if="githubStore.search.loading" class="container__wrapper container__wrapper_loading">
+        Загрузка
+      </div>
+      <div
+        v-else-if="!githubStore.resultItems?.length"
+        class="container__wrapper container__wrapper_empty"
+      >
+        <span v-if="!githubStore.searchText.length">В вашем репозиторий пусто ;(</span>
         <span v-else>По запросу нет совпадений</span>
       </div>
       <repository-card
         v-else
-        v-for="item in resultItems"
+        v-for="item in githubStore.resultItems"
         :key="item.updatedAt"
         :name="item.name"
+        :owner="item.owner.login"
         :stars="item.stargazerCount"
         :updated="item.pushedAt"
         :url="`https://github.com${item.resourcePath}`"
+        class="card"
       >
         {{ item.node.name }}
       </repository-card>
     </div>
+    <squad-paginator
+      v-if="!githubStore.search.loading"
+      v-model:page="currentPage"
+      :size="ITEMS_ON_PAGE"
+      :total-elements="githubStore.repoCount"
+      class="pagination"
+    ></squad-paginator>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { watchDebounced } from '@vueuse/core';
-import { useQuery } from '@vue/apollo-composable';
+import { ref, watch } from 'vue';
 
+import { useQuery } from '@vue/apollo-composable';
 import gql from 'graphql-tag';
 
+import { useGithubStore } from '@/stores/githubStore';
+
 import RepositoryCard from '@/components/RepositoryCard.vue';
+import SquadPaginator from '@/components/SquadPaginator.vue';
 
-const searchText = ref<string>('');
+const githubStore = useGithubStore();
 
-const { result: userResult } = useQuery(gql`
+const ITEMS_ON_PAGE = 10;
+const currentPage = ref(0);
+
+const { result: user } = useQuery(gql`
   query {
     viewer {
       login
@@ -49,17 +68,14 @@ const { result: userResult } = useQuery(gql`
   }
 `);
 
-const userLogin = computed(() => userResult.value?.viewer?.login ?? '');
+watch(user, (val) => {
+  githubStore.userLogin = val.viewer?.login;
+  if (githubStore.search?.variables) {
+    githubStore.search.variables = githubStore.searchVariables;
+  }
+});
 
-const searchVariables = computed(() => ({
-  queryString: searchText.value.length ? `name:${searchText.value}` : `user:${userLogin.value}`
-}));
-
-const {
-  result: searchResult,
-  variables,
-  loading
-} = useQuery(
+githubStore.search = useQuery(
   gql`
     query SearchMostTop10Star($queryString: String!) {
       search(query: $queryString, type: REPOSITORY, first: 10) {
@@ -71,25 +87,16 @@ const {
               stargazerCount
               resourcePath
               pushedAt
+              owner {
+                login
+              }
             }
           }
         }
       }
     }
   `,
-  searchVariables
-);
-
-const resultItems = computed(() => {
-  return searchResult.value?.search?.edges.map((item: any) => item.node) ?? [];
-});
-
-watchDebounced(
-  searchText,
-  () => {
-    variables.value = searchVariables.value;
-  },
-  { debounce: 500, maxWait: 1000 }
+  githubStore.searchVariables
 );
 </script>
 
@@ -120,5 +127,11 @@ watchDebounced(
 }
 .container__wrapper_loading {
   color: yellowgreen;
+}
+.card {
+  margin: 1rem;
+}
+.pagination {
+  margin: 1rem 1.4rem;
 }
 </style>

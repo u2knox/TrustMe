@@ -1,6 +1,6 @@
 <template>
   <div class="card">
-    <router-link :to="{ name: 'repository', params: { id: 1 } }">
+    <router-link :to="{ name: 'repository', params: { owner: props.owner, name: props.name } }">
       <h2 class="card__title">{{ props.name }}</h2>
     </router-link>
     <span class="card__stars">Звезд: {{ props.stars }}</span>
@@ -17,6 +17,7 @@ interface Props {
   stars: number;
   updated: string;
   url: string;
+  owner: string;
 }
 const props = defineProps<Props>();
 
@@ -30,7 +31,6 @@ const formatDate = (date: Date) => {
   -webkit-box-shadow: 0px 4px 8px 0px rgba(34, 60, 80, 0.2);
   -moz-box-shadow: 0px 4px 8px 0px rgba(34, 60, 80, 0.2);
   box-shadow: 0px 4px 8px 0px rgba(34, 60, 80, 0.2);
-  margin: 1rem;
   padding: 0.6rem 1.5rem;
   border-radius: 0.4rem;
   display: flex;
@@ -38,5 +38,6 @@ const formatDate = (date: Date) => {
 }
 .card__title {
   color: teal;
+  text-decoration: none;
 }
 </style>
