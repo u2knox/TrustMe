@@ -5,14 +5,12 @@
         class="search__input"
         type="text"
         name="search"
-        v-model="githubStore.searchText"
+        v-model="searchText"
         placeholder="Поиск"
       />
     </div>
     <div class="container">
-      <div v-if="githubStore.search.loading" class="container__wrapper container__wrapper_loading">
-        Загрузка
-      </div>
+      <div v-if="loading" class="container__wrapper container__wrapper_loading">Загрузка</div>
       <div
         v-else-if="!githubStore.resultItems?.length"
         class="container__wrapper container__wrapper_empty"
@@ -34,31 +32,33 @@
         {{ item.node.name }}
       </repository-card>
     </div>
-    <squad-paginator
-      v-if="!githubStore.search.loading"
-      v-model:page="currentPage"
-      :size="ITEMS_ON_PAGE"
-      :total-elements="githubStore.repoCount"
+    <simple-pagination
+      :page="githubStore.pageInfo"
       class="pagination"
-    ></squad-paginator>
+      @prev="goToPrev"
+      @next="goToNext"
+    ></simple-pagination>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-
+import { computed, watch } from 'vue';
+import { watchDebounced } from '@vueuse/core';
 import { useQuery } from '@vue/apollo-composable';
 import gql from 'graphql-tag';
 
 import { useGithubStore } from '@/stores/githubStore';
 
 import RepositoryCard from '@/components/RepositoryCard.vue';
-import SquadPaginator from '@/components/SquadPaginator.vue';
+// import SquadPaginator from '@/components/SquadPaginator.vue';
+import SimplePagination from '@/components/SimplePagination.vue';
+import { storeToRefs } from 'pinia';
 
 const githubStore = useGithubStore();
+const { searchText, searchResult, userLogin, afterCursor, beforeCursor } = storeToRefs(githubStore);
 
-const ITEMS_ON_PAGE = 10;
-const currentPage = ref(0);
+// const ITEMS_ON_PAGE = 10;
+// const currentPage = ref(0);
 
 const { result: user } = useQuery(gql`
   query {
@@ -68,17 +68,21 @@ const { result: user } = useQuery(gql`
   }
 `);
 
+const searchVariables = computed(() => ({
+  queryString: searchText.value.length ? `name:${searchText.value}` : `user:${userLogin.value}`,
+  after: afterCursor.value,
+  before: beforeCursor.value
+}));
+
 watch(user, (val) => {
-  githubStore.userLogin = val.viewer?.login;
-  if (githubStore.search?.variables) {
-    githubStore.search.variables = githubStore.searchVariables;
-  }
+  userLogin.value = val.viewer?.login;
+  variables.value = searchVariables.value;
 });
 
-githubStore.search = useQuery(
+const { result, variables, loading } = useQuery(
   gql`
-    query SearchMostTop10Star($queryString: String!) {
-      search(query: $queryString, type: REPOSITORY, first: 10) {
+    query SearchMostTop10Star($queryString: String!, $after: String, $before: String) {
+      search(query: $queryString, type: REPOSITORY, first: 10, after: $after, before: $before) {
         repositoryCount
         edges {
           node {
@@ -93,11 +97,48 @@ githubStore.search = useQuery(
             }
           }
         }
+        pageInfo {
+          startCursor
+          hasNextPage
+          hasPreviousPage
+          endCursor
+        }
       }
     }
   `,
-  githubStore.searchVariables
+  searchVariables.value
 );
+
+watch(result, (val) => (searchResult.value = val));
+
+watchDebounced(
+  searchText,
+  () => {
+    variables.value = searchVariables.value;
+    // search.value.refetch();
+  },
+  { debounce: 500, maxWait: 1000 }
+);
+
+const goToPrev = (val: string) => {
+  beforeCursor.value = val;
+  afterCursor.value = null;
+  variables.value = {
+    queryString: searchText.value.length ? `name:${searchText.value}` : `user:${userLogin.value}`,
+    after: afterCursor.value,
+    before: beforeCursor.value
+  };
+};
+
+const goToNext = (val: string) => {
+  beforeCursor.value = null;
+  afterCursor.value = val;
+  variables.value = {
+    queryString: searchText.value.length ? `name:${searchText.value}` : `user:${userLogin.value}`,
+    after: afterCursor.value,
+    before: beforeCursor.value
+  };
+};
 </script>
 
 <style scoped>

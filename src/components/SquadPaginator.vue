@@ -1,5 +1,6 @@
 <template>
   <div class="paginator">
+    <!-- Пытался сделать пагинацию по заданию. По документации, не понял как можно было бы реализовать за отведенное время -->
     <div class="paginator__info">
       <span>Страница {{ props.page + 1 }} из {{ totalPages }}</span>
     </div>
